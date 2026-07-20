@@ -60,6 +60,12 @@ export default function Account() {
   const [jellyfinApiKey, setJellyfinApiKey] = useState('');
   const [savingJellyfin, setSavingJellyfin] = useState(false);
 
+  const [qbitProxyEnabled, setQbitProxyEnabled] = useState(false);
+  const [qbitRealUrl, setQbitRealUrl] = useState('');
+  const [qbitUsername, setQbitUsername] = useState('');
+  const [qbitPassword, setQbitPassword] = useState('');
+  const [savingQbit, setSavingQbit] = useState(false);
+
   const { toast } = useUI();
   const navigate = useNavigate();
 
@@ -78,6 +84,10 @@ export default function Account() {
         const data = await settingsRes.json();
         setJellyfinUrl(data.jellyfinUrl || '');
         setJellyfinApiKey(data.jellyfinApiKey || '');
+        setQbitProxyEnabled(data.qbitProxyEnabled || false);
+        setQbitRealUrl(data.qbitRealUrl || '');
+        setQbitUsername(data.qbitUsername || '');
+        setQbitPassword(data.qbitPassword || '');
       }
     } catch (err) {
       console.error(err);
@@ -297,6 +307,68 @@ export default function Account() {
 
             <button type="submit" className="btn btn-start account-submit" disabled={savingJellyfin}>
               <Save size={18} /> {savingJellyfin ? 'Saving…' : 'Save Settings'}
+            </button>
+          </form>
+        </div>
+
+        <div className="glass-panel users-panel">
+          <h2 className="section-title"><Server size={22} /> qBittorrent Transparent Proxy</h2>
+          <p className="settings-description" style={{ marginBottom: '1.5rem', color: '#8b92a5' }}>
+            Allow Radarr/Sonarr to send torrents to GhostSeed (which will start seeding them automatically), 
+            and GhostSeed will silently forward the real download to your actual qBittorrent client.
+          </p>
+
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            setSavingQbit(true);
+            try {
+              const res = await fetchWithAuth('/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ qbitProxyEnabled, qbitRealUrl, qbitUsername, qbitPassword })
+              });
+              const data = await res.json().catch(() => ({}));
+              if (res.ok && data.success) {
+                toast('Proxy settings saved', 'success');
+              } else {
+                toast(data.error || 'Failed to save', 'error');
+              }
+            } catch {
+              toast('Network error', 'error');
+            }
+            setSavingQbit(false);
+          }} className="account-form">
+            <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+              <input 
+                type="checkbox" 
+                id="qbitProxyEnabled"
+                checked={qbitProxyEnabled} 
+                onChange={e => setQbitProxyEnabled(e.target.checked)} 
+              />
+              <label htmlFor="qbitProxyEnabled" style={{ marginBottom: 0 }}>Enable qBittorrent Proxy</label>
+            </div>
+
+            {qbitProxyEnabled && (
+              <>
+                <div className="form-group">
+                  <label>Real qBittorrent URL</label>
+                  <input type="url" className="form-control" value={qbitRealUrl} onChange={e => setQbitRealUrl(e.target.value)} placeholder="http://192.168.1.50:8080" />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Real qBittorrent Username</label>
+                    <input type="text" className="form-control" value={qbitUsername} onChange={e => setQbitUsername(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label>Real qBittorrent Password</label>
+                    <input type="password" className="form-control" value={qbitPassword} onChange={e => setQbitPassword(e.target.value)} />
+                  </div>
+                </div>
+              </>
+            )}
+            
+            <button type="submit" className="btn btn-start account-submit" disabled={savingQbit}>
+              <Save size={18} /> {savingQbit ? 'Saving…' : 'Save Settings'}
             </button>
           </form>
         </div>

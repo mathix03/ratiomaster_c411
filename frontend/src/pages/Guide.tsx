@@ -1,4 +1,4 @@
-import { BookOpen, Server, Search, Upload, Sparkles } from 'lucide-react';
+import { BookOpen, Server, Search, Upload, Sparkles, Network } from 'lucide-react';
 import '../App.css';
 
 export default function Guide() {
@@ -78,6 +78,23 @@ export default function Guide() {
               juste un texte triste, tu auras la vraie affiche du film récupérée depuis chez toi.
               Ça rend l'interface de GhostSeed magnifique ! ✨
             </li>
+          </ol>
+        </div>
+
+        <div className="glass-panel users-panel">
+          <h2 className="section-title">
+            <Network size={22} /> 4. Proxy Transparent qBittorrent (Radarr / Sonarr)
+          </h2>
+          <p className="guide-text">
+            GhostSeed peut se faire passer pour un vrai client qBittorrent. Cela permet à tes outils d'automatisation (Radarr, Sonarr, Jellyseerr) d'envoyer les torrents directement à GhostSeed !
+          </p>
+          <ol className="guide-steps">
+            <li>Va dans la page <strong>My Account</strong> et active le <strong>qBittorrent Transparent Proxy</strong>.</li>
+            <li>Entre l'URL, le nom d'utilisateur et le mot de passe de ton <strong>vrai</strong> serveur qBittorrent. Sauvegarde.</li>
+            <li>Dans Radarr ou Sonarr, ajoute un nouveau client de téléchargement <strong>qBittorrent</strong>.</li>
+            <li>Pour l'hôte (Host), mets l'adresse de ton serveur <strong>GhostSeed</strong>.</li>
+            <li>Pour le nom d'utilisateur et le mot de passe, utilise <strong>tes identifiants GhostSeed</strong>.</li>
+            <li>Sauvegarde et teste ! Radarr croira parler à qBittorrent, mais en réalité il parlera à GhostSeed. Le torrent se mettra en faux seed (pour le ratio), puis sera transféré silencieusement à ton vrai client pour le téléchargement !</li>
           </ol>
         </div>
       </div>

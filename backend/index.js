@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const path = require('path');
 const auth = require('./auth');
 const store = require('./database');
+const qbittorrentRouter = require('./qbittorrent');
 
 const app = express();
 app.use(cors());
@@ -126,9 +127,12 @@ app.post('/api/register', (req, res) => {
 
 // Protect all API routes below this point (except login/register which are above)
 app.use('/api', (req, res, next) => {
-  if (req.path === '/login' || req.path === '/register') return next();
+  if (req.path === '/login' || req.path === '/register' || req.path.startsWith('/v2/')) return next();
   return auth.authenticateToken(req, res, next);
 });
+
+// Mount qBittorrent proxy at /api/v2
+app.use('/api/v2', qbittorrentRouter);
 
 app.get('/api/admin/stats', auth.isAdmin, (req, res) => {
   const userCount = auth.getUserCount();
@@ -504,14 +508,22 @@ function fluctuate(baseSpeed) {
 app.get('/api/settings', (req, res) => {
   res.json({
     jellyfinUrl: store.getSetting(`jellyfinUrl_${req.user.username}`, ''),
-    jellyfinApiKey: store.getSetting(`jellyfinApiKey_${req.user.username}`, '')
+    jellyfinApiKey: store.getSetting(`jellyfinApiKey_${req.user.username}`, ''),
+    qbitProxyEnabled: store.getSetting(`qbitProxyEnabled_${req.user.username}`, false),
+    qbitRealUrl: store.getSetting(`qbitRealUrl_${req.user.username}`, ''),
+    qbitUsername: store.getSetting(`qbitUsername_${req.user.username}`, ''),
+    qbitPassword: store.getSetting(`qbitPassword_${req.user.username}`, '')
   });
 });
 
 app.post('/api/settings', (req, res) => {
-  const { jellyfinUrl, jellyfinApiKey } = req.body;
+  const { jellyfinUrl, jellyfinApiKey, qbitProxyEnabled, qbitRealUrl, qbitUsername, qbitPassword } = req.body;
   if (jellyfinUrl !== undefined) store.setSetting(`jellyfinUrl_${req.user.username}`, jellyfinUrl);
   if (jellyfinApiKey !== undefined) store.setSetting(`jellyfinApiKey_${req.user.username}`, jellyfinApiKey);
+  if (qbitProxyEnabled !== undefined) store.setSetting(`qbitProxyEnabled_${req.user.username}`, qbitProxyEnabled);
+  if (qbitRealUrl !== undefined) store.setSetting(`qbitRealUrl_${req.user.username}`, qbitRealUrl);
+  if (qbitUsername !== undefined) store.setSetting(`qbitUsername_${req.user.username}`, qbitUsername);
+  if (qbitPassword !== undefined) store.setSetting(`qbitPassword_${req.user.username}`, qbitPassword);
   res.json({ success: true });
 });
 

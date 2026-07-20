@@ -6,5 +6,9 @@ frontend/dist/
 backend/database.json
 backend/config.json
 backend/ghost.json
+backend/users.json
+backend/database.sqlite
+backend/database.sqlite-shm
+backend/database.sqlite-wal
 *.log
 .DS_Store
