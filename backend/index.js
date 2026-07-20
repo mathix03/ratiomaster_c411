@@ -4,13 +4,25 @@ const multer = require('multer');
 const axios = require('axios');
 const crypto = require('crypto');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const auth = require('./auth');
 const store = require('./database');
+const { decrypt, encrypt } = require('./secretbox');
 const qbittorrentRouter = require('./qbittorrent');
 
 const app = express();
+app.set('trust proxy', 1); // behind Cloudflare/reverse proxy — needed for correct client IPs (rate limiting)
 app.use(cors());
 app.use(express.json());
+
+// Throttle authentication endpoints to slow down brute-force / credential stuffing.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please wait a few minutes and try again.' }
+});
 
 // Admin Stats tracking — restored from disk on boot so a restart doesn't reset totals
 const adminStats = {
@@ -100,7 +112,7 @@ setInterval(() => {
 // Keep live upload counters and speeds ticking on open dashboards (no-op when none are connected)
 setInterval(broadcastAdmin, 2000);
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', authLimiter, (req, res) => {
   const { username, password } = req.body;
   if (auth.verifyUser(username, password)) {
     if (auth.isBlocked(username)) {
@@ -113,7 +125,7 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-app.post('/api/register', (req, res) => {
+app.post('/api/register', authLimiter, (req, res) => {
   const { username, password } = req.body;
   const result = auth.registerUser(username, password);
   if (result.success) {
@@ -506,31 +518,41 @@ function fluctuate(baseSpeed) {
 }
 
 app.get('/api/settings', (req, res) => {
+  // Security: never echo stored secrets (Jellyfin API key, qBittorrent password)
+  // back to the client. Expose only whether each is set so the UI can indicate it.
+  const jellyfinApiKey = store.getSetting(`jellyfinApiKey_${req.user.username}`, '');
+  const qbitPassword = store.getSetting(`qbitPassword_${req.user.username}`, '');
   res.json({
     jellyfinUrl: store.getSetting(`jellyfinUrl_${req.user.username}`, ''),
-    jellyfinApiKey: store.getSetting(`jellyfinApiKey_${req.user.username}`, ''),
+    jellyfinApiKeySet: !!jellyfinApiKey,
     qbitProxyEnabled: store.getSetting(`qbitProxyEnabled_${req.user.username}`, false),
     qbitRealUrl: store.getSetting(`qbitRealUrl_${req.user.username}`, ''),
     qbitUsername: store.getSetting(`qbitUsername_${req.user.username}`, ''),
-    qbitPassword: store.getSetting(`qbitPassword_${req.user.username}`, '')
+    qbitPasswordSet: !!qbitPassword
   });
 });
 
 app.post('/api/settings', (req, res) => {
   const { jellyfinUrl, jellyfinApiKey, qbitProxyEnabled, qbitRealUrl, qbitUsername, qbitPassword } = req.body;
   if (jellyfinUrl !== undefined) store.setSetting(`jellyfinUrl_${req.user.username}`, jellyfinUrl);
-  if (jellyfinApiKey !== undefined) store.setSetting(`jellyfinApiKey_${req.user.username}`, jellyfinApiKey);
   if (qbitProxyEnabled !== undefined) store.setSetting(`qbitProxyEnabled_${req.user.username}`, qbitProxyEnabled);
   if (qbitRealUrl !== undefined) store.setSetting(`qbitRealUrl_${req.user.username}`, qbitRealUrl);
   if (qbitUsername !== undefined) store.setSetting(`qbitUsername_${req.user.username}`, qbitUsername);
-  if (qbitPassword !== undefined) store.setSetting(`qbitPassword_${req.user.username}`, qbitPassword);
+  // Secrets: only overwrite when a non-empty value is provided (a blank field keeps
+  // the existing secret), and store them encrypted at rest.
+  if (typeof jellyfinApiKey === 'string' && jellyfinApiKey.length > 0) {
+    store.setSetting(`jellyfinApiKey_${req.user.username}`, encrypt(jellyfinApiKey));
+  }
+  if (typeof qbitPassword === 'string' && qbitPassword.length > 0) {
+    store.setSetting(`qbitPassword_${req.user.username}`, encrypt(qbitPassword));
+  }
   res.json({ success: true });
 });
 
 app.get('/api/jellyfin/search', async (req, res) => {
   const { query } = req.query;
   const jellyfinUrl = store.getSetting(`jellyfinUrl_${req.user.username}`, '');
-  const jellyfinApiKey = store.getSetting(`jellyfinApiKey_${req.user.username}`, '');
+  const jellyfinApiKey = decrypt(store.getSetting(`jellyfinApiKey_${req.user.username}`, ''));
 
   if (!jellyfinUrl || !jellyfinApiKey) {
     return res.status(400).json({ error: 'Jellyfin is not configured for your account' });
@@ -788,7 +810,7 @@ app.get('/api/me', (req, res) => {
   });
 });
 
-app.post('/api/me/password', (req, res) => {
+app.post('/api/me/password', authLimiter, (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!auth.verifyUser(req.user.username, currentPassword || '')) {
     return res.status(400).json({ error: 'Current password is incorrect' });

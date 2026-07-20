@@ -58,12 +58,14 @@ export default function Account() {
   
   const [jellyfinUrl, setJellyfinUrl] = useState('');
   const [jellyfinApiKey, setJellyfinApiKey] = useState('');
+  const [jellyfinApiKeySet, setJellyfinApiKeySet] = useState(false);
   const [savingJellyfin, setSavingJellyfin] = useState(false);
 
   const [qbitProxyEnabled, setQbitProxyEnabled] = useState(false);
   const [qbitRealUrl, setQbitRealUrl] = useState('');
   const [qbitUsername, setQbitUsername] = useState('');
   const [qbitPassword, setQbitPassword] = useState('');
+  const [qbitPasswordSet, setQbitPasswordSet] = useState(false);
   const [savingQbit, setSavingQbit] = useState(false);
 
   const { toast } = useUI();
@@ -83,11 +85,11 @@ export default function Account() {
       if (settingsRes.ok) {
         const data = await settingsRes.json();
         setJellyfinUrl(data.jellyfinUrl || '');
-        setJellyfinApiKey(data.jellyfinApiKey || '');
+        setJellyfinApiKeySet(!!data.jellyfinApiKeySet);
         setQbitProxyEnabled(data.qbitProxyEnabled || false);
         setQbitRealUrl(data.qbitRealUrl || '');
         setQbitUsername(data.qbitUsername || '');
-        setQbitPassword(data.qbitPassword || '');
+        setQbitPasswordSet(!!data.qbitPasswordSet);
       }
     } catch (err) {
       console.error(err);
@@ -271,6 +273,7 @@ export default function Account() {
               const data = await res.json().catch(() => ({}));
               if (res.ok && data.success) {
                 toast('Jellyfin settings saved', 'success');
+                if (jellyfinApiKey) { setJellyfinApiKeySet(true); setJellyfinApiKey(''); }
               } else {
                 toast(data.error || 'Failed to save', 'error');
               }
@@ -297,11 +300,11 @@ export default function Account() {
                 className="form-control"
                 value={jellyfinApiKey}
                 onChange={e => setJellyfinApiKey(e.target.value)}
-                placeholder="Enter the API key from your Jellyfin dashboard"
+                placeholder={jellyfinApiKeySet ? '•••••••• (saved — leave blank to keep)' : 'Enter the API key from your Jellyfin dashboard'}
                 autoComplete="off"
               />
               <div className="field-hint" style={{ fontSize: '0.8rem', color: '#8b92a5', marginTop: '0.4rem' }}>
-                Jellyfin → Dashboard → API Keys → “+”. The key is stored securely.
+                Jellyfin → Dashboard → API Keys → “+”. The key is encrypted at rest and never sent back to the browser.
               </div>
             </div>
 
@@ -330,6 +333,7 @@ export default function Account() {
               const data = await res.json().catch(() => ({}));
               if (res.ok && data.success) {
                 toast('Proxy settings saved', 'success');
+                if (qbitPassword) { setQbitPasswordSet(true); setQbitPassword(''); }
               } else {
                 toast(data.error || 'Failed to save', 'error');
               }
@@ -361,7 +365,8 @@ export default function Account() {
                   </div>
                   <div className="form-group">
                     <label>Real qBittorrent Password</label>
-                    <input type="password" className="form-control" value={qbitPassword} onChange={e => setQbitPassword(e.target.value)} />
+                    <input type="password" className="form-control" value={qbitPassword} onChange={e => setQbitPassword(e.target.value)}
+                      placeholder={qbitPasswordSet ? '•••••••• (saved — leave blank to keep)' : ''} autoComplete="off" />
                   </div>
                 </div>
               </>

@@ -4,13 +4,22 @@ const multer = require('multer');
 const FormData = require('form-data');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const auth = require('./auth');
 const store = require('./database');
+const { decrypt } = require('./secretbox');
+const { JWT_SECRET } = require('./secret');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
+const proxyLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many login attempts. Please wait a few minutes.'
+});
 
 const realQbitCookies = {};
 
@@ -40,7 +49,7 @@ const getRealQbitCookie = async (username) => {
 
   const url = store.getSetting(`qbitRealUrl_${username}`, '');
   const user = store.getSetting(`qbitUsername_${username}`, '');
-  const pass = store.getSetting(`qbitPassword_${username}`, '');
+  const pass = decrypt(store.getSetting(`qbitPassword_${username}`, ''));
 
   if (!url) return null;
 
@@ -72,15 +81,15 @@ const getRealQbitCookie = async (username) => {
   }
 };
 
-router.post('/auth/login', express.urlencoded({ extended: true }), (req, res) => {
+router.post('/auth/login', proxyLoginLimiter, express.urlencoded({ extended: true }), (req, res) => {
   const { username, password } = req.body;
-  
-  if (auth.verifyUser(username, password)) {
+
+  if (auth.verifyUser(username, password) && !auth.isBlocked(username)) {
     const token = auth.generateToken(username);
-    res.cookie('SID', token, { httpOnly: true });
+    res.cookie('SID', token, { httpOnly: true, sameSite: 'lax', secure: req.secure });
     return res.send('Ok.');
   }
-  
+
   res.status(403).send('Fails.');
 });
 

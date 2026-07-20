@@ -4,15 +4,18 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const USERS_FILE = path.join(__dirname, 'users.json');
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
+const { JWT_SECRET } = require('./secret');
 
-// Initialize default admin user if file doesn't exist
+const USERS_FILE = path.join(__dirname, 'users.json');
+
+// Initialize default admin user if file doesn't exist.
+// Security: never ship fixed default credentials (admin/admin). Generate a
+// strong random password and print it once so the operator can log in and
+// change it. It is never stored in plaintext.
 if (!fs.existsSync(USERS_FILE)) {
-  const defaultPassword = 'admin';
-  const salt = bcrypt.genSaltSync(10);
-  const hash = bcrypt.hashSync(defaultPassword, salt);
-  
+  const defaultPassword = crypto.randomBytes(9).toString('base64url'); // ~12 chars
+  const hash = bcrypt.hashSync(defaultPassword, 10);
+
   const initialUsers = {
     admin: {
       passwordHash: hash,
@@ -21,7 +24,11 @@ if (!fs.existsSync(USERS_FILE)) {
     }
   };
   fs.writeFileSync(USERS_FILE, JSON.stringify(initialUsers, null, 2));
-  console.log('Created default admin user (admin / admin)');
+  console.log('==================================================================');
+  console.log('  Created default admin account');
+  console.log(`  username: admin   password: ${defaultPassword}`);
+  console.log('  ^ Log in and change this password immediately.');
+  console.log('==================================================================');
 }
 
 function readUsers() {

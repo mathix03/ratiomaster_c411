@@ -7,6 +7,7 @@ backend/database.json
 backend/config.json
 backend/ghost.json
 backend/users.json
+backend/.jwt-secret
 backend/database.sqlite
 backend/database.sqlite-shm
 backend/database.sqlite-wal
